@@ -1,0 +1,45 @@
+{
+	"schemaVersion": 1,
+	"id": "personal-difficulties",
+	"version": "${version}",
+	"name": "Personal Difficulties",
+	"description": "This mod is a server side mod that allows players to set the difficulty for only them without affecting other players!",
+	"authors": [
+		"devvydont"
+	],
+	"contact": {
+		"homepage": "https://devvydont.xyz",
+		"sources": "https://github.com/DevvyDont/PersonalDifficulties"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/personal-difficulties/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			{
+				"value": "xyz.devvydont.PersonalDifficulties",
+				"adapter": "kotlin"
+			}
+		],
+		"client": [
+			{
+				"value": "xyz.devvydont.client.PersonalDifficultiesClient",
+				"adapter": "kotlin"
+			}
+		]
+	},
+	"mixins": [
+		"personal-difficulties.mixins.json",
+		{
+			"config": "personal-difficulties.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.2",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
+		"fabric-api": "*",
+		"fabric-language-kotlin": "*"
+	}
+}
