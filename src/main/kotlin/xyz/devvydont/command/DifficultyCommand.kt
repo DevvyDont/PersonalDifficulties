@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
+import me.lucko.fabric.api.permissions.v0.Permissions
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.fabricmc.fabric.api.util.TriState
 import net.minecraft.commands.CommandSourceStack
@@ -14,6 +15,8 @@ import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.server.permissions.PermissionLevel
 import net.minecraft.world.Difficulty
+import net.minecraft.world.entity.player.Player
+import xyz.devvydont.PersonalDifficulties
 import xyz.devvydont.PersonalDifficulties.MOD_ID
 import xyz.devvydont.data.PlayerDifficultyData
 import java.util.concurrent.CompletableFuture
@@ -96,7 +99,7 @@ object DifficultyCommand {
 
     private fun executeSetOther(ctx: CommandContext<CommandSourceStack>): Int {
         // Permission check: require at least permission level 2 (operators)
-        val hasPerm = ctx.source.checkPermission(Identifier.fromNamespaceAndPath(MOD_ID, "modifyothers")) == TriState.TRUE
+        val hasPerm = Permissions.check(ctx.source, "${MOD_ID}.modifyothers")
         val hasOp = ctx.source.player?.permissionContext?.permissionLevel()?.isEqualOrHigherThan(PermissionLevel.ADMINS) ?: false
         if (!(hasPerm || hasOp)) {
             ctx.source.sendFailure(Component.literal("You do not have permission to set other players' difficulties."))
