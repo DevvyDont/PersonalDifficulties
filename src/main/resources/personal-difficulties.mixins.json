@@ -6,7 +6,8 @@
     "FoodDataExhaustionMixin",
     "MobTargetingMixin",
     "ServerPlayerDamageMixin",
-    "ServerPlayerRegenerationMixin"
+    "ServerPlayerRegenerationMixin",
+    "ZombieDoorBreakingMixin"
   ],
   "injectors": {
     "defaultRequire": 1

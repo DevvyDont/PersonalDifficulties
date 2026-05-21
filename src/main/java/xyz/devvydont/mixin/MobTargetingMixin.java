@@ -3,10 +3,13 @@ package xyz.devvydont.mixin;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.player.Player;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import xyz.devvydont.data.PlayerDifficultyData;
 
@@ -27,6 +30,28 @@ public class MobTargetingMixin {
         if (target instanceof Player player)
             if (PlayerDifficultyData.INSTANCE.getPlayerDifficulty(player) == Difficulty.PEACEFUL)
                 cir.setReturnValue(null);
+    }
+
+    /**
+     * Allows a zombie to break doors on any difficulty if they end up targeting a player that
+     * is on hard.
+     * @param target
+     * @param ci
+     */
+    @Inject(
+            method = "setTarget",
+            at = @At("TAIL")
+    )
+    private void afterSetTarget(LivingEntity target, CallbackInfo ci) {
+
+        if (!(target instanceof Player player))
+            return;
+
+        var self = (Mob) (Object) this;
+        if (!(self instanceof Zombie zombie))
+            return;
+
+        zombie.setCanBreakDoors(PlayerDifficultyData.INSTANCE.getPlayerDifficulty(player) == Difficulty.HARD);
     }
 
 }
