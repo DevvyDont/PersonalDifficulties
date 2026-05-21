@@ -26,10 +26,15 @@ object DifficultyCommand {
     private val DIFFICULTY_NAMES = listOf("peaceful", "easy", "normal", "hard")
 
     fun register() {
+
+        val difficultyArgument = Commands.argument("difficulty", StringArgumentType.word())
+            .suggests(this::difficultySuggestions)
+
         CommandRegistrationCallback.EVENT.register(CommandRegistrationCallback { dispatcher, _, _ ->
             dispatcher.register(
                 Commands.literal("personaldifficulty")
                     .executes { ctx -> executeGet(ctx) }
+                    .then(difficultyArgument.executes { ctx -> executeSetSelf(ctx) })
                     .then(Commands.literal("get")
                         .then(Commands.argument("target", EntityArgument.player())
                             .executes { ctx -> executeGet(ctx) })
@@ -37,13 +42,10 @@ object DifficultyCommand {
                     .then(Commands.literal("reset")
                         .executes { ctx -> executeReset(ctx, ctx.source.playerOrException) })
                     .then(Commands.literal("set")
-                        .then(Commands.argument("difficulty", StringArgumentType.word())
-                            .suggests(this::difficultySuggestions)
+                        .then(difficultyArgument
                             .executes { ctx -> executeSetSelf(ctx) })
                         .then(Commands.argument("target", EntityArgument.players())
-                            .then(Commands.argument("difficulty", StringArgumentType.word())
-                                .suggests(this::difficultySuggestions)
-                                .executes { ctx -> executeSetOther(ctx) })))
+                            .then(difficultyArgument.executes { ctx -> executeSetOther(ctx) })))
             )
         })
     }
