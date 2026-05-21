@@ -1,14 +1,16 @@
 {
-	"required": true,
-	"package": "xyz.devvydont.mixin",
-	"compatibilityLevel": "JAVA_25",
-	"mixins": [
-		"ServerPlayerDamageMixin"
-	],
-	"injectors": {
-		"defaultRequire": 1
-	},
-	"overwrites": {
-		"requireAnnotations": true
+  "required": true,
+  "package": "xyz.devvydont.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "FoodDataExhaustionMixin",
+    "ServerPlayerDamageMixin",
+    "ServerPlayerRegenerationMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
 	}
 }

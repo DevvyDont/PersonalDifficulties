@@ -1,6 +1,7 @@
 package xyz.devvydont.mixin;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
@@ -9,15 +10,15 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import xyz.devvydont.data.PlayerDifficultyData;
 
 /**
- * This mixin hijacks into damage logic to override where the
+ * This mixin hijacks into regeneration logic to override where the
  * computed difficulty is to use our mod's set difficulty rather than relying on
- * the server's difficulty. This causes the .5/1/1.5x damage multiplier scaling
+ * the server's difficulty. This provides regeneration behavior when on peaceful mode.
  */
-@Mixin(Player.class)
-public class ServerPlayerDamageMixin {
+@Mixin(ServerPlayer.class)
+public class ServerPlayerRegenerationMixin {
 
     @Redirect(
-            method = "hurtServer",
+            method = "tickRegeneration",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/server/level/ServerLevel;getDifficulty()Lnet/minecraft/world/Difficulty;"
