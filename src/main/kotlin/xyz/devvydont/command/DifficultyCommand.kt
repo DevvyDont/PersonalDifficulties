@@ -13,7 +13,9 @@ import net.minecraft.commands.arguments.EntityArgument
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.server.permissions.Permission
 import net.minecraft.server.permissions.PermissionLevel
+import net.minecraft.server.players.NameAndId
 import net.minecraft.world.Difficulty
 import net.minecraft.world.entity.player.Player
 import xyz.devvydont.PersonalDifficulties
@@ -102,7 +104,11 @@ object DifficultyCommand {
     private fun executeSetOther(ctx: CommandContext<CommandSourceStack>): Int {
         // Permission check: require at least permission level 2 (operators)
         val hasPerm = Permissions.check(ctx.source, "${MOD_ID}.modifyothers")
-        val hasOp = ctx.source.player?.permissionContext?.permissionLevel()?.isEqualOrHigherThan(PermissionLevel.ADMINS) ?: false
+        val player = ctx.source.player
+        var hasOp = false
+        if (player != null)
+            hasOp = ctx.source.server.playerList.isOp(NameAndId(player.gameProfile))
+
         if (!(hasPerm || hasOp)) {
             ctx.source.sendFailure(Component.literal("You do not have permission to set other players' difficulties."))
             return 0
