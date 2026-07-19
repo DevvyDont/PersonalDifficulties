@@ -64,6 +64,12 @@ kotlin {
 }
 
 java {
+	// Select a Java 25 toolchain regardless of the JDK running Gradle, so command-line
+	// and CI builds don't depend on the ambient `java` on PATH (which may be older).
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 	// if it is present.
 	// If you remove this line, sources will not be generated.
