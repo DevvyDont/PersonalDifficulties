@@ -1,16 +1,20 @@
 package xyz.devvydont.command
 
+import com.mojang.brigadier.context.CommandContext
 import me.lucko.fabric.api.permissions.v0.Permissions
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
+import net.minecraft.network.chat.Component
 import net.minecraft.server.players.NameAndId
 import xyz.devvydont.PersonalDifficulties.MOD_ID
+import xyz.devvydont.menu.SettingsMenu
 
 /**
  * Registers the mod's command tree. Feature commands contribute their own subtrees:
  * difficulty occupies the root level, and other personal settings live under their
- * own literals (e.g. /personaldifficulty keepinventory).
+ * own literals (e.g. /personaldifficulty keepinventory). The bare command opens the
+ * settings menu for players; consoles must use the subcommands.
  */
 object ModCommands {
 
@@ -23,16 +27,29 @@ object ModCommands {
     fun register() {
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             val root = dispatcher.register(
-                DifficultyCommand.appendTo(Commands.literal(ROOT_COMMAND))
+                DifficultyCommand.appendTo(
+                    Commands.literal(ROOT_COMMAND)
+                        .executes { ctx -> executeOpenMenu(ctx) })
                     .then(KeepInventoryCommand.build())
             )
 
             // A Brigadier redirect only forwards when arguments follow it, so the alias
             // needs its own executes for the bare command.
             dispatcher.register(Commands.literal(ROOT_ALIAS)
-                .executes { ctx -> DifficultyCommand.executeGetSelf(ctx) }
+                .executes { ctx -> executeOpenMenu(ctx) }
                 .redirect(root))
         }
+    }
+
+    private fun executeOpenMenu(ctx: CommandContext<CommandSourceStack>): Int {
+        val player = ctx.source.player
+        if (player == null) {
+            ctx.source.sendFailure(Component.literal("Only players can open the settings menu; use the subcommands instead."))
+            return 0
+        }
+
+        SettingsMenu.open(player)
+        return 1
     }
 
     /**

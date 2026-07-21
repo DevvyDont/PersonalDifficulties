@@ -9,8 +9,8 @@ import net.minecraft.commands.Commands
 import net.minecraft.commands.arguments.EntityArgument
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.level.gamerules.GameRules
 import xyz.devvydont.data.PlayerKeepInventoryData
+import xyz.devvydont.message.SettingsMessages
 
 /**
  * The keep inventory portion of the command tree: lets players view, set, and reset
@@ -46,24 +46,8 @@ object KeepInventoryCommand {
         return Commands.argument(VALUE_ARGUMENT, BoolArgumentType.bool())
     }
 
-    private fun enabledWord(value: Boolean): String {
-        return if (value) "enabled" else "disabled"
-    }
-
-    private fun serverKeepInventory(player: ServerPlayer): Boolean {
-        return player.level().gameRules[GameRules.KEEP_INVENTORY]
-    }
-
-    private fun describe(player: ServerPlayer): String {
-        val override = PlayerKeepInventoryData.getPlayerKeepInventoryOverride(player)
-        return if (override == null)
-            "following the server setting (${enabledWord(serverKeepInventory(player))})"
-        else
-            enabledWord(override)
-    }
-
     private fun reportKeepInventory(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer): Int {
-        ctx.source.sendSuccess({ Component.literal("${player.plainTextName}'s keep inventory is: ${describe(player)}") }, false)
+        ctx.source.sendSuccess({ Component.literal("${player.plainTextName}'s keep inventory is: ${SettingsMessages.describeKeepInventory(player)}") }, false)
         return 1
     }
 
@@ -86,7 +70,7 @@ object KeepInventoryCommand {
         val value = BoolArgumentType.getBool(ctx, VALUE_ARGUMENT)
 
         PlayerKeepInventoryData.setPlayerKeepInventory(player, value)
-        ctx.source.sendSuccess({ Component.literal("Set your personal keep inventory to ${enabledWord(value)}") }, false)
+        ctx.source.sendSuccess({ SettingsMessages.keepInventorySet(value) }, false)
         return 1
     }
 
@@ -101,8 +85,8 @@ object KeepInventoryCommand {
 
         for (target in targets) {
             PlayerKeepInventoryData.setPlayerKeepInventory(target, value)
-            target.sendSystemMessage(Component.literal("Your personal keep inventory was set to ${enabledWord(value)} by ${ctx.source.textName}"))
-            ctx.source.sendSuccess({ Component.literal("Set ${target.plainTextName}'s keep inventory to ${enabledWord(value)}") }, true)
+            target.sendSystemMessage(Component.literal("Your personal keep inventory was set to ${SettingsMessages.enabledWord(value)} by ${ctx.source.textName}"))
+            ctx.source.sendSuccess({ Component.literal("Set ${target.plainTextName}'s keep inventory to ${SettingsMessages.enabledWord(value)}") }, true)
         }
 
         return targets.size
@@ -112,7 +96,7 @@ object KeepInventoryCommand {
         val player = ctx.source.playerOrException
 
         PlayerKeepInventoryData.clearPlayerKeepInventory(player)
-        ctx.source.sendSuccess({ Component.literal("Your keep inventory now follows the server setting (${enabledWord(serverKeepInventory(player))}).") }, false)
+        ctx.source.sendSuccess({ SettingsMessages.keepInventoryFollowsServer(player) }, false)
         return 1
     }
 }

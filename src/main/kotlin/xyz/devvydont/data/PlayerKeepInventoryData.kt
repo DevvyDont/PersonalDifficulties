@@ -4,7 +4,9 @@ import com.mojang.serialization.Codec
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType
 import net.minecraft.resources.Identifier
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.level.gamerules.GameRules
 import xyz.devvydont.PersonalDifficulties
 
 /**
@@ -37,6 +39,14 @@ object PlayerKeepInventoryData {
      */
     fun getEffectiveKeepInventory(player: Player, serverValue: Boolean): Boolean {
         return player.getAttachedOrElse(keepInventoryAttachment, serverValue)
+    }
+
+    /**
+     * The value of the server's keep inventory game rule, i.e. what applies to players
+     * without a personal override.
+     */
+    fun getServerKeepInventory(player: ServerPlayer): Boolean {
+        return player.level().gameRules[GameRules.KEEP_INVENTORY]
     }
 
     fun setPlayerKeepInventory(player: Player, keepInventory: Boolean) {

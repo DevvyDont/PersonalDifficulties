@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.Difficulty
 import xyz.devvydont.data.PlayerDifficultyData
+import xyz.devvydont.message.SettingsMessages
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -25,11 +26,11 @@ object DifficultyCommand {
 
     /**
      * Attaches the difficulty nodes to the root of the command tree. Difficulty is the
-     * mod's original feature, so it owns the root-level get/set/reset grammar.
+     * mod's original feature, so it owns the root-level get/set/reset grammar. The bare
+     * root command itself belongs to ModCommands (it opens the settings menu).
      */
     internal fun appendTo(builder: LiteralArgumentBuilder<CommandSourceStack>): LiteralArgumentBuilder<CommandSourceStack> {
         return builder
-            .executes { ctx -> executeGetSelf(ctx) }
             .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
             .then(Commands.literal("get")
                 .executes { ctx -> executeGetSelf(ctx) }
@@ -81,7 +82,7 @@ object DifficultyCommand {
         return 1
     }
 
-    internal fun executeGetSelf(ctx: CommandContext<CommandSourceStack>): Int {
+    private fun executeGetSelf(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.player
         if (player == null) {
             ctx.source.sendFailure(Component.literal("Only players can use this command without a target!"))
@@ -100,7 +101,7 @@ object DifficultyCommand {
         val difficulty = parseDifficultyArgument(ctx) ?: return 0
 
         PlayerDifficultyData.setPlayerDifficulty(player, difficulty)
-        ctx.source.sendSuccess({ Component.literal("Set your personal difficulty to ${difficulty.serializedName}") }, false)
+        ctx.source.sendSuccess({ SettingsMessages.difficultySet(difficulty) }, false)
         return 1
     }
 
