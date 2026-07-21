@@ -35,8 +35,6 @@ public class MobTargetingMixin {
     /**
      * Allows a zombie to break doors on any difficulty if they end up targeting a player that
      * is on hard.
-     * @param target
-     * @param ci
      */
     @Inject(
             method = "setTarget",

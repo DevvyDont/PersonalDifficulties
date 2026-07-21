@@ -1,139 +1,151 @@
-﻿package xyz.devvydont.command
+package xyz.devvydont.command
 
 import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.builder.RequiredArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import me.lucko.fabric.api.permissions.v0.Permissions
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
-import net.fabricmc.fabric.api.util.TriState
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.commands.arguments.EntityArgument
 import net.minecraft.network.chat.Component
-import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.server.permissions.Permission
-import net.minecraft.server.permissions.PermissionLevel
 import net.minecraft.server.players.NameAndId
 import net.minecraft.world.Difficulty
-import net.minecraft.world.entity.player.Player
-import xyz.devvydont.PersonalDifficulties
 import xyz.devvydont.PersonalDifficulties.MOD_ID
 import xyz.devvydont.data.PlayerDifficultyData
 import java.util.concurrent.CompletableFuture
 
+/**
+ * The /personaldifficulty command: lets players view, set, and reset their own personal
+ * difficulty, and lets privileged sources set the difficulty of other players.
+ */
 object DifficultyCommand {
 
-    private val DIFFICULTY_NAMES = listOf("peaceful", "easy", "normal", "hard")
+    private const val COMMAND_NAME = "personaldifficulty"
+    private const val DIFFICULTY_ARGUMENT = "difficulty"
+    private const val TARGET_ARGUMENT = "target"
+    private const val MODIFY_OTHERS_PERMISSION = "$MOD_ID.modifyothers"
 
     fun register() {
-
-        val difficultyArgument = Commands.argument("difficulty", StringArgumentType.word())
-            .suggests(this::difficultySuggestions)
-
-        CommandRegistrationCallback.EVENT.register(CommandRegistrationCallback { dispatcher, _, _ ->
+        CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
             dispatcher.register(
-                Commands.literal("personaldifficulty")
-                    .executes { ctx -> executeGet(ctx) }
-                    .then(difficultyArgument.executes { ctx -> executeSetSelf(ctx) })
+                Commands.literal(COMMAND_NAME)
+                    .executes { ctx -> executeGetSelf(ctx) }
+                    .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
                     .then(Commands.literal("get")
-                        .then(Commands.argument("target", EntityArgument.player())
-                            .executes { ctx -> executeGet(ctx) })
-                        .executes { ctx -> executeGet(ctx) })
+                        .executes { ctx -> executeGetSelf(ctx) }
+                        .then(Commands.argument(TARGET_ARGUMENT, EntityArgument.player())
+                            .executes { ctx -> executeGetOther(ctx) }))
                     .then(Commands.literal("reset")
-                        .executes { ctx -> executeReset(ctx, ctx.source.playerOrException) })
+                        .executes { ctx -> executeReset(ctx) })
                     .then(Commands.literal("set")
-                        .then(difficultyArgument
-                            .executes { ctx -> executeSetSelf(ctx) })
-                        .then(Commands.argument("target", EntityArgument.players())
-                            .then(difficultyArgument.executes { ctx -> executeSetOther(ctx) })))
+                        .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
+                        .then(Commands.argument(TARGET_ARGUMENT, EntityArgument.players())
+                            .then(difficultyArgument().executes { ctx -> executeSetOther(ctx) })))
             )
-        })
+        }
     }
 
-    private fun difficultySuggestions(ctx: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
-        DIFFICULTY_NAMES.forEach { d -> builder.suggest(d) }
+    /**
+     * Builds a fresh difficulty argument node. Brigadier builders are mutable, so every
+     * branch of the command tree must get its own instance rather than share one.
+     */
+    private fun difficultyArgument(): RequiredArgumentBuilder<CommandSourceStack, String> {
+        return Commands.argument(DIFFICULTY_ARGUMENT, StringArgumentType.word())
+            .suggests { _, builder -> suggestDifficulties(builder) }
+    }
+
+    private fun suggestDifficulties(builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
+        Difficulty.entries.forEach { difficulty -> builder.suggest(difficulty.serializedName) }
         return builder.buildFuture()
     }
 
     private fun parseDifficulty(name: String): Difficulty? {
-        return DIFFICULTY_NAMES.indexOf(name.lowercase()).let { idx ->
-            when (idx) {
-                0 -> Difficulty.PEACEFUL
-                1 -> Difficulty.EASY
-                2 -> Difficulty.NORMAL
-                3 -> Difficulty.HARD
-                else -> null
-            }
+        return Difficulty.entries.firstOrNull { difficulty ->
+            difficulty.serializedName.equals(name, ignoreCase = true)
         }
     }
 
-    private fun executeGet(ctx: CommandContext<CommandSourceStack>): Int {
-        val player = try {
-            EntityArgument.getPlayer(ctx, "target")
-        } catch (e: IllegalArgumentException) {
-            // No target argument, try to get player from command source
-            try {
-                ctx.source.playerOrException
-            } catch (e: Exception) {
-                ctx.source.sendFailure(Component.literal("Only players can use this command with no arguments!"))
-                return 0
-            }
+    /**
+     * Reads and parses the difficulty argument, sending a failure message to the source
+     * when the value is not a valid difficulty name.
+     */
+    private fun parseDifficultyArgument(ctx: CommandContext<CommandSourceStack>): Difficulty? {
+        val name = StringArgumentType.getString(ctx, DIFFICULTY_ARGUMENT)
+        val difficulty = parseDifficulty(name)
+        if (difficulty == null)
+            ctx.source.sendFailure(Component.literal("Invalid difficulty: $name"))
+        return difficulty
+    }
+
+    /**
+     * A source may modify other players' difficulties if it has the permission node
+     * (LuckPerms and similar via fabric-permissions-api) or is a server operator.
+     */
+    private fun canModifyOthers(source: CommandSourceStack): Boolean {
+        if (Permissions.check(source, MODIFY_OTHERS_PERMISSION))
+            return true
+
+        val player = source.player ?: return false
+        return source.server.playerList.isOp(NameAndId(player.gameProfile))
+    }
+
+    private fun reportDifficulty(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer): Int {
+        val difficulty = PlayerDifficultyData.getPlayerDifficulty(player)
+        ctx.source.sendSuccess({ Component.literal("${player.plainTextName}'s difficulty is: ${difficulty.serializedName}") }, false)
+        return 1
+    }
+
+    private fun executeGetSelf(ctx: CommandContext<CommandSourceStack>): Int {
+        val player = ctx.source.player
+        if (player == null) {
+            ctx.source.sendFailure(Component.literal("Only players can use this command without a target!"))
+            return 0
         }
 
-        val difficulty = PlayerDifficultyData.getPlayerDifficulty(player)
-        ctx.source.sendSuccess({ Component.literal("${player.plainTextName}'s difficulty is: ${difficulty.name}")}, false)
-        return 1
+        return reportDifficulty(ctx, player)
+    }
+
+    private fun executeGetOther(ctx: CommandContext<CommandSourceStack>): Int {
+        return reportDifficulty(ctx, EntityArgument.getPlayer(ctx, TARGET_ARGUMENT))
     }
 
     private fun executeSetSelf(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.playerOrException
-        val diffName = StringArgumentType.getString(ctx, "difficulty")
-        val difficulty = parseDifficulty(diffName) ?: run {
-            ctx.source.sendFailure(Component.literal("Invalid difficulty: $diffName"))
-            return 0
-        }
+        val difficulty = parseDifficultyArgument(ctx) ?: return 0
 
         PlayerDifficultyData.setPlayerDifficulty(player, difficulty)
-        // Optional: mark unsaved, see persistence note
-        ctx.source.sendSuccess({ Component.literal("Set your personal difficulty to ${difficulty.name.lowercase()}") }, false)
+        ctx.source.sendSuccess({ Component.literal("Set your personal difficulty to ${difficulty.serializedName}") }, false)
         return 1
     }
 
     private fun executeSetOther(ctx: CommandContext<CommandSourceStack>): Int {
-        // Permission check: require at least permission level 2 (operators)
-        val hasPerm = Permissions.check(ctx.source, "${MOD_ID}.modifyothers")
-        val player = ctx.source.player
-        var hasOp = false
-        if (player != null)
-            hasOp = ctx.source.server.playerList.isOp(NameAndId(player.gameProfile))
-
-        if (!(hasPerm || hasOp)) {
+        if (!canModifyOthers(ctx.source)) {
             ctx.source.sendFailure(Component.literal("You do not have permission to set other players' difficulties."))
             return 0
         }
 
-        val targets = EntityArgument.getPlayers(ctx, "target")
-        val diffName = StringArgumentType.getString(ctx, "difficulty")
-        val difficulty = parseDifficulty(diffName) ?: run {
-            ctx.source.sendFailure(Component.literal("Invalid difficulty: $diffName"))
-            return 0
+        val difficulty = parseDifficultyArgument(ctx) ?: return 0
+        val targets = EntityArgument.getPlayers(ctx, TARGET_ARGUMENT)
+
+        for (target in targets) {
+            PlayerDifficultyData.setPlayerDifficulty(target, difficulty)
+            target.sendSystemMessage(Component.literal("Your personal difficulty was set to ${difficulty.serializedName} by ${ctx.source.textName}"))
+            ctx.source.sendSuccess({ Component.literal("Set ${target.plainTextName}'s difficulty to ${difficulty.serializedName}") }, true)
         }
 
-        for (player in targets) {
-            PlayerDifficultyData.setPlayerDifficulty(player, difficulty)
-            player.sendSystemMessage(Component.literal("Your personal difficulty was set to ${difficulty.name.lowercase()} by ${ctx.source.textName}"))
-            ctx.source.sendSuccess({ Component.literal("Set ${player.plainTextName}'s difficulty to ${difficulty.name.lowercase()}") }, true)
-        }
-
-        return 1
+        return targets.size
     }
 
-    private fun executeReset(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer): Int {
-        // Reset to default: we can treat reset as setting to NORMAL or removing attachment (your design)
-        PlayerDifficultyData.setPlayerDifficulty(player, Difficulty.NORMAL)
-        ctx.source.sendSuccess({ Component.literal("Reset your personal difficulty to normal.") }, false)
+    private fun executeReset(ctx: CommandContext<CommandSourceStack>): Int {
+        val player = ctx.source.playerOrException
+        val default = PlayerDifficultyData.DEFAULT_DIFFICULTY
+
+        PlayerDifficultyData.setPlayerDifficulty(player, default)
+        ctx.source.sendSuccess({ Component.literal("Reset your personal difficulty to ${default.serializedName}.") }, false)
         return 1
     }
 }

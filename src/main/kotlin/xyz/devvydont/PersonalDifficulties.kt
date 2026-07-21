@@ -8,24 +8,25 @@ import xyz.devvydont.command.DifficultyCommand
 import xyz.devvydont.data.PlayerDifficultyData
 
 object PersonalDifficulties : ModInitializer {
-	val MOD_ID = "personal_difficulties"
-	private val logger = LoggerFactory.getLogger("personal-difficulties")
+
+	const val MOD_ID = "personal_difficulties"
+
+	private val logger = LoggerFactory.getLogger(MOD_ID)
 
 	override fun onInitialize() {
 
 		// Register the player difficulty data attachment for persistence.
 		PlayerDifficultyData.register()
-		logger.info("Registered difficulty persistence registry")
+		logger.info("Registered player difficulty attachment")
 
 		// Register the command in order to modify player difficulties.
 		DifficultyCommand.register()
-		logger.info("Registered /difficulty command")
+		logger.info("Registered /personaldifficulty command")
 
 		// Set the server difficulty to hard for ideal game mechanic purposes.
-		ServerLifecycleEvents.SERVER_STARTED.register(ServerLifecycleEvents.ServerStarted { server ->
+		ServerLifecycleEvents.SERVER_STARTED.register { server ->
 			server.setDifficulty(Difficulty.HARD, true)
 			logger.info("Server difficulty set to hard for ideal game mechanic behavior. This does not affect the damage people take!")
-		})
-
+		}
 	}
 }
