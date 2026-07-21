@@ -25,13 +25,14 @@ import java.util.concurrent.CompletableFuture
 object DifficultyCommand {
 
     private const val COMMAND_NAME = "personaldifficulty"
+    private const val COMMAND_ALIAS = "pd"
     private const val DIFFICULTY_ARGUMENT = "difficulty"
     private const val TARGET_ARGUMENT = "target"
     private const val MODIFY_OTHERS_PERMISSION = "$MOD_ID.modifyothers"
 
     fun register() {
         CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-            dispatcher.register(
+            val root = dispatcher.register(
                 Commands.literal(COMMAND_NAME)
                     .executes { ctx -> executeGetSelf(ctx) }
                     .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
@@ -46,6 +47,12 @@ object DifficultyCommand {
                         .then(Commands.argument(TARGET_ARGUMENT, EntityArgument.players())
                             .then(difficultyArgument().executes { ctx -> executeSetOther(ctx) })))
             )
+
+            // A Brigadier redirect only forwards when arguments follow it, so the alias
+            // needs its own executes for the bare command.
+            dispatcher.register(Commands.literal(COMMAND_ALIAS)
+                .executes { ctx -> executeGetSelf(ctx) }
+                .redirect(root))
         }
     }
 
