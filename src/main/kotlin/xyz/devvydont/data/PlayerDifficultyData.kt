@@ -21,10 +21,11 @@ object PlayerDifficultyData {
     private lateinit var difficultyAttachment: AttachmentType<Difficulty>
 
     fun register() {
-        difficultyAttachment = AttachmentRegistry.createPersistent(
-            Identifier.fromNamespaceAndPath(PersonalDifficulties.MOD_ID, ATTACHMENT_PATH),
-            Difficulty.CODEC
-        )
+        // copyOnDeath is required: without it the attachment is dropped when a player
+        // respawns, silently resetting their difficulty on every death.
+        difficultyAttachment = AttachmentRegistry.create<Difficulty>(
+            Identifier.fromNamespaceAndPath(PersonalDifficulties.MOD_ID, ATTACHMENT_PATH)
+        ) { builder -> builder.persistent(Difficulty.CODEC).copyOnDeath() }
     }
 
     fun getPlayerDifficulty(player: Player): Difficulty {

@@ -1,59 +1,46 @@
 package xyz.devvydont.command
 
 import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.builder.RequiredArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
-import me.lucko.fabric.api.permissions.v0.Permissions
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.commands.Commands
 import net.minecraft.commands.arguments.EntityArgument
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.server.players.NameAndId
 import net.minecraft.world.Difficulty
-import xyz.devvydont.PersonalDifficulties.MOD_ID
 import xyz.devvydont.data.PlayerDifficultyData
 import java.util.concurrent.CompletableFuture
 
 /**
- * The /personaldifficulty command: lets players view, set, and reset their own personal
- * difficulty, and lets privileged sources set the difficulty of other players.
+ * The difficulty portion of the command tree: lets players view, set, and reset their
+ * own personal difficulty, and lets privileged sources set the difficulty of others.
  */
 object DifficultyCommand {
 
-    private const val COMMAND_NAME = "personaldifficulty"
-    private const val COMMAND_ALIAS = "pd"
     private const val DIFFICULTY_ARGUMENT = "difficulty"
-    private const val TARGET_ARGUMENT = "target"
-    private const val MODIFY_OTHERS_PERMISSION = "$MOD_ID.modifyothers"
 
-    fun register() {
-        CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-            val root = dispatcher.register(
-                Commands.literal(COMMAND_NAME)
-                    .executes { ctx -> executeGetSelf(ctx) }
-                    .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
-                    .then(Commands.literal("get")
-                        .executes { ctx -> executeGetSelf(ctx) }
-                        .then(Commands.argument(TARGET_ARGUMENT, EntityArgument.player())
-                            .executes { ctx -> executeGetOther(ctx) }))
-                    .then(Commands.literal("reset")
-                        .executes { ctx -> executeReset(ctx) })
-                    .then(Commands.literal("set")
-                        .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
-                        .then(Commands.argument(TARGET_ARGUMENT, EntityArgument.players())
-                            .then(difficultyArgument().executes { ctx -> executeSetOther(ctx) })))
-            )
-
-            // A Brigadier redirect only forwards when arguments follow it, so the alias
-            // needs its own executes for the bare command.
-            dispatcher.register(Commands.literal(COMMAND_ALIAS)
+    /**
+     * Attaches the difficulty nodes to the root of the command tree. Difficulty is the
+     * mod's original feature, so it owns the root-level get/set/reset grammar.
+     */
+    internal fun appendTo(builder: LiteralArgumentBuilder<CommandSourceStack>): LiteralArgumentBuilder<CommandSourceStack> {
+        return builder
+            .executes { ctx -> executeGetSelf(ctx) }
+            .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
+            .then(Commands.literal("get")
                 .executes { ctx -> executeGetSelf(ctx) }
-                .redirect(root))
-        }
+                .then(Commands.argument(ModCommands.TARGET_ARGUMENT, EntityArgument.player())
+                    .executes { ctx -> executeGetOther(ctx) }))
+            .then(Commands.literal("reset")
+                .executes { ctx -> executeReset(ctx) })
+            .then(Commands.literal("set")
+                .then(difficultyArgument().executes { ctx -> executeSetSelf(ctx) })
+                .then(Commands.argument(ModCommands.TARGET_ARGUMENT, EntityArgument.players())
+                    .then(difficultyArgument().executes { ctx -> executeSetOther(ctx) })))
     }
 
     /**
@@ -88,25 +75,13 @@ object DifficultyCommand {
         return difficulty
     }
 
-    /**
-     * A source may modify other players' difficulties if it has the permission node
-     * (LuckPerms and similar via fabric-permissions-api) or is a server operator.
-     */
-    private fun canModifyOthers(source: CommandSourceStack): Boolean {
-        if (Permissions.check(source, MODIFY_OTHERS_PERMISSION))
-            return true
-
-        val player = source.player ?: return false
-        return source.server.playerList.isOp(NameAndId(player.gameProfile))
-    }
-
     private fun reportDifficulty(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer): Int {
         val difficulty = PlayerDifficultyData.getPlayerDifficulty(player)
         ctx.source.sendSuccess({ Component.literal("${player.plainTextName}'s difficulty is: ${difficulty.serializedName}") }, false)
         return 1
     }
 
-    private fun executeGetSelf(ctx: CommandContext<CommandSourceStack>): Int {
+    internal fun executeGetSelf(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.player
         if (player == null) {
             ctx.source.sendFailure(Component.literal("Only players can use this command without a target!"))
@@ -117,7 +92,7 @@ object DifficultyCommand {
     }
 
     private fun executeGetOther(ctx: CommandContext<CommandSourceStack>): Int {
-        return reportDifficulty(ctx, EntityArgument.getPlayer(ctx, TARGET_ARGUMENT))
+        return reportDifficulty(ctx, EntityArgument.getPlayer(ctx, ModCommands.TARGET_ARGUMENT))
     }
 
     private fun executeSetSelf(ctx: CommandContext<CommandSourceStack>): Int {
@@ -130,13 +105,13 @@ object DifficultyCommand {
     }
 
     private fun executeSetOther(ctx: CommandContext<CommandSourceStack>): Int {
-        if (!canModifyOthers(ctx.source)) {
+        if (!ModCommands.canModifyOthers(ctx.source)) {
             ctx.source.sendFailure(Component.literal("You do not have permission to set other players' difficulties."))
             return 0
         }
 
         val difficulty = parseDifficultyArgument(ctx) ?: return 0
-        val targets = EntityArgument.getPlayers(ctx, TARGET_ARGUMENT)
+        val targets = EntityArgument.getPlayers(ctx, ModCommands.TARGET_ARGUMENT)
 
         for (target in targets) {
             PlayerDifficultyData.setPlayerDifficulty(target, difficulty)

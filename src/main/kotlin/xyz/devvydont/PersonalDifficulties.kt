@@ -4,8 +4,9 @@ import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.minecraft.world.Difficulty
 import org.slf4j.LoggerFactory
-import xyz.devvydont.command.DifficultyCommand
+import xyz.devvydont.command.ModCommands
 import xyz.devvydont.data.PlayerDifficultyData
+import xyz.devvydont.data.PlayerKeepInventoryData
 
 object PersonalDifficulties : ModInitializer {
 
@@ -15,12 +16,13 @@ object PersonalDifficulties : ModInitializer {
 
 	override fun onInitialize() {
 
-		// Register the player difficulty data attachment for persistence.
+		// Register the player data attachments for persistence.
 		PlayerDifficultyData.register()
-		logger.info("Registered player difficulty attachment")
+		PlayerKeepInventoryData.register()
+		logger.info("Registered player data attachments")
 
-		// Register the command in order to modify player difficulties.
-		DifficultyCommand.register()
+		// Register the command tree used to view and modify personal settings.
+		ModCommands.register()
 		logger.info("Registered /personaldifficulty command")
 
 		// Set the server difficulty to hard for ideal game mechanic purposes.

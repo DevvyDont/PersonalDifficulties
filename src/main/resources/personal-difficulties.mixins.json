@@ -5,8 +5,10 @@
   "mixins": [
     "FoodDataExhaustionMixin",
     "MobTargetingMixin",
+    "PlayerDeathDropsMixin",
     "ServerPlayerDamageMixin",
     "ServerPlayerRegenerationMixin",
+    "ServerPlayerRestoreMixin",
     "ZombieDoorBreakingMixin"
   ],
   "injectors": {
