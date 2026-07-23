@@ -32,9 +32,17 @@ jobs:
         with:
           name: Artifacts
           path: build/libs/
+      # Glob-based exclusion of the sources jar is unreliable here ([!sources] is a
+      # single-character class and minimatch's !(...) extglob does not exclude as
+      # expected), so stage the release files with plain shell instead.
+      - name: stage release assets
+        run: |
+          mkdir release-assets
+          cp build/libs/*.jar release-assets/
+          rm -f release-assets/*-sources.jar
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/[!sources]*.jar
+          files: release-assets/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
